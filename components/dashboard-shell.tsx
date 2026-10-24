@@ -14,6 +14,7 @@ type NavigationItem = {
 const navigation: Record<Role, NavigationItem[]> = {
   STUDENT: [
     { label: "My meals", href: "/student" },
+    { label: "Meal QR", href: "/student/qr" },
   ],
   ADMIN: [
     { label: "Kitchen overview", href: "/admin" },

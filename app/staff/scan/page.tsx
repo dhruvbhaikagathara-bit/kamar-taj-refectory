@@ -1,70 +1,88 @@
 import { Suspense } from "react";
-import { requireRole } from "@/lib/auth/require-role";
-import { DashboardLogoutButton } from "@/components/dashboard-logout-button";
 
-async function ScannerDashboard() {
-  const { user, profile } = await requireRole("SCANNER_STAFF");
+import { requireRole } from "@/lib/auth/require-role";
+import { createClient } from "@/lib/supabase/server";
+import { DashboardLogoutButton } from "@/components/dashboard-logout-button";
+import {
+  MealScanner,
+  type ScannerMeal,
+} from "@/components/meal-scanner";
+
+async function ScannerContent() {
+  const { profile } = await requireRole("SCANNER_STAFF");
+  const supabase = await createClient();
+
+  const now = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from("meal_slots")
+    .select(
+      "id, meal_date, meal_type, menu, serve_start, serve_end"
+    )
+    .lte("serve_start", now)
+    .gt("serve_end", now)
+    .order("serve_start", { ascending: true })
+    .limit(60);
+
+  const meals = (data ?? []) as ScannerMeal[];
 
   return (
-    <main className="min-h-screen bg-[#FAFCFC] px-6 py-12 text-[#152D33]">
-      <div className="mx-auto max-w-2xl space-y-8">
-        <div className="flex justify-end">
-          <DashboardLogoutButton />
-        </div>
-
-        <header>
-          <p className="text-sm font-semibold uppercase tracking-widest text-[#087A68]">
-            Kamar-Taj Refectory
+    <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
+      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wider text-[#087A68]">
+            Scanner staff
           </p>
 
-          <h1 className="mt-3 text-3xl font-bold">
+          <h1 className="mt-2 text-3xl font-bold text-[#152D33]">
             Meal check-in
           </h1>
 
-          <p className="mt-2 text-slate-600">
-            Welcome, {profile.full_name || "Scanner Staff"}
+          <p className="mt-2 text-sm text-slate-600">
+            Signed in as {profile.full_name || "Scanner staff"}
           </p>
-        </header>
+        </div>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">Your account</h2>
+        <DashboardLogoutButton />
+      </header>
 
-          <dl className="mt-5 space-y-4">
-            <div>
-              <dt className="text-sm text-slate-500">Email</dt>
-              <dd className="break-all font-medium">{user.email}</dd>
-            </div>
+      <div className="mb-6 rounded-2xl bg-[#EFF5F7] p-5">
+        <p className="text-sm text-[#152D33]">
+          Select the meal being served, then scan the student's
+          current QR pass. Serve the meal only after an Accepted
+          result.
+        </p>
 
-            <div>
-              <dt className="text-sm text-slate-500">Role</dt>
-              <dd className="font-medium">{profile.role}</dd>
-            </div>
-
-            <div>
-              <dt className="text-sm text-slate-500">Account status</dt>
-              <dd className="font-medium text-[#087A68]">
-                {profile.account_status}
-              </dd>
-            </div>
-          </dl>
-        </section>
-
-        <section className="rounded-2xl border-2 border-dashed border-[#087A68] bg-[#EFF5F7] p-8 text-center">
-          <h2 className="text-xl font-semibold">QR scanner</h2>
-
-          <p className="mt-3 text-slate-600">
-            Camera scanning and meal verification are not available yet.
-          </p>
-        </section>
+        <p className="mt-2 text-sm text-slate-600">
+          Only meals currently inside their serving window appear.
+          Refresh this page when a new serving window begins.
+        </p>
       </div>
+
+      {error ? (
+        <div
+          role="alert"
+          className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"
+        >
+          Unable to load meals. Refresh the page and try again.
+        </div>
+      ) : (
+        <MealScanner meals={meals} />
+      )}
     </main>
   );
 }
 
 export default function ScannerPage() {
   return (
-    <Suspense fallback={<p className="p-8">Loading scanner page...</p>}>
-      <ScannerDashboard />
+    <Suspense
+      fallback={
+        <div className="p-6 text-slate-600" role="status">
+          Loading meal scanner…
+        </div>
+      }
+    >
+      <ScannerContent />
     </Suspense>
   );
 }
