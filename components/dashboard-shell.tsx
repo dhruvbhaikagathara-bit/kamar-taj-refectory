@@ -18,6 +18,7 @@ const navigation: Record<Role, NavigationItem[]> = {
   ADMIN: [
     { label: "Kitchen overview", href: "/admin" },
     { label: "Create meal", href: "/admin/meals" },
+    { label: "Edit menu", href: "/admin/meals/edit" },
   ],
   SCANNER_STAFF: [
     { label: "Meal scanner", href: "/staff/scan" },
