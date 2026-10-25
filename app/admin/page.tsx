@@ -86,6 +86,13 @@ async function AdminDashboard() {
             Welcome, {profile.full_name || "Admin"}
           </h1>
 
+          <a
+            href="/admin/analytics"
+            className="inline-flex rounded-lg bg-[#087A68] px-4 py-2 text-sm font-medium text-white hover:bg-[#066452]"
+            >
+            View meal analytics
+          </a>
+
           <p className="mt-2 text-slate-600">
             Plan kitchen preparation using students’ saved meal choices.
           </p>
