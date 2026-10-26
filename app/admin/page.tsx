@@ -61,7 +61,8 @@ async function AdminDashboard() {
   );
 
   const meals: MealForecast[] = data ?? [];
-  const now = Date.now();
+ // eslint-disable-next-line react-hooks/purity -- Read the server clock after authentication and uncached database access.
+const now = Date.now();
 
   return (
     <main className="min-h-screen bg-[#FAFCFC] px-6 py-12 text-[#152D33]">

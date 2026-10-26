@@ -95,7 +95,8 @@ async function StudentDashboard() {
     ]),
   );
 
-  const serverNow = Date.now();
+ // eslint-disable-next-line react-hooks/purity -- Supply a request-time server clock snapshot to the meal countdown.
+const serverNow = Date.now();
 
   return (
     <main className="min-h-screen bg-[#F5F8F7] px-4 py-6 text-[#152D33] sm:px-6 sm:py-10">

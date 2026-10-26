@@ -17,7 +17,7 @@ async function ScannerContent() {
   const { data, error } = await supabase
     .from("meal_slots")
     .select(
-      "id, meal_date, meal_type, menu, serve_start, serve_end"
+      "id, meal_date, meal_type, menu, serve_start, serve_end",
     )
     .lte("serve_start", now)
     .gt("serve_end", now)
@@ -39,7 +39,8 @@ async function ScannerContent() {
           </h1>
 
           <p className="mt-2 text-sm text-slate-600">
-            Signed in as {profile.full_name || "Scanner staff"}
+            Signed in as{" "}
+            {profile.full_name || "Scanner staff"}
           </p>
         </div>
 
@@ -48,14 +49,15 @@ async function ScannerContent() {
 
       <div className="mb-6 rounded-2xl bg-[#EFF5F7] p-5">
         <p className="text-sm text-[#152D33]">
-          Select the meal being served, then scan the student's
-          current QR pass. Serve the meal only after an Accepted
-          result.
+          Select the meal being served, then scan the
+          student&apos;s current QR pass. Serve the meal
+          only after an Accepted result.
         </p>
 
         <p className="mt-2 text-sm text-slate-600">
-          Only meals currently inside their serving window appear.
-          Refresh this page when a new serving window begins.
+          Only meals currently inside their serving window
+          appear. Refresh this page when a new serving
+          window begins.
         </p>
       </div>
 

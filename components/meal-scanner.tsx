@@ -56,7 +56,6 @@ export function MealScanner({ meals }: { meals: ScannerMeal[] }) {
 
   useEffect(() => {
     mountedRef.current = true;
-    setBusy(false);
 
     return () => {
       mountedRef.current = false;
@@ -91,7 +90,7 @@ export function MealScanner({ meals }: { meals: ScannerMeal[] }) {
 
     const timeout = window.setTimeout(
       () => controller.abort(),
-      15000
+      15000,
     );
 
     function isCurrentRequest() {
@@ -171,7 +170,7 @@ export function MealScanner({ meals }: { meals: ScannerMeal[] }) {
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setCameraError(
-        "Camera access requires HTTPS or localhost in a supported browser."
+        "Camera access requires HTTPS or localhost in a supported browser.",
       );
       return;
     }
@@ -219,7 +218,7 @@ export function MealScanner({ meals }: { meals: ScannerMeal[] }) {
             scanControls.stop();
             void submitToken(decoded.getText());
           }
-        }
+        },
       );
 
       if (
@@ -246,7 +245,7 @@ export function MealScanner({ meals }: { meals: ScannerMeal[] }) {
             ? "Camera permission was denied. Allow camera access and try again."
             : name === "NotFoundError"
               ? "No camera was found on this device."
-              : "Unable to start the camera. Close other camera apps and try again."
+              : "Unable to start the camera. Close other camera apps and try again.",
         );
       }
     } finally {
@@ -260,6 +259,7 @@ export function MealScanner({ meals }: { meals: ScannerMeal[] }) {
     return (
       <div className="rounded-2xl border bg-white p-6">
         <p>No meals are available for scanning.</p>
+
         <button
           type="button"
           onClick={() => window.location.reload()}

@@ -111,7 +111,8 @@ async function AnalyticsContent({ searchParams }: PageProps) {
   }
 
   const meals = (data ?? []) as MealAnalytics[];
-  const now = Date.now();
+ // eslint-disable-next-line react-hooks/purity -- Read the server clock after authentication and uncached database access.
+const now = Date.now();
 
   const total = (key: keyof Pick<
     MealAnalytics,
