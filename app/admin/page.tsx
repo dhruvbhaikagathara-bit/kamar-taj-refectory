@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
+
 import { requireRole } from "@/lib/auth/require-role";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardLogoutButton } from "@/components/dashboard-logout-button";
@@ -55,7 +56,9 @@ async function AdminDashboard() {
   const { user, profile } = await requireRole("ADMIN");
   const supabase = await createClient();
 
-  const { data, error } = await supabase.rpc("get_meal_forecast");
+  const { data, error } = await supabase.rpc(
+    "get_meal_forecast",
+  );
 
   const meals: MealForecast[] = data ?? [];
   const now = Date.now();
@@ -86,34 +89,43 @@ async function AdminDashboard() {
             Welcome, {profile.full_name || "Admin"}
           </h1>
 
-          <a
-            href="/admin/analytics"
-            className="inline-flex rounded-lg bg-[#087A68] px-4 py-2 text-sm font-medium text-white hover:bg-[#066452]"
-            >
-            View meal analytics
-          </a>
-
           <p className="mt-2 text-slate-600">
-            Plan kitchen preparation using students’ saved meal choices.
+            Plan kitchen preparation using students’ saved
+            meal choices.
           </p>
         </header>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold">Your account</h2>
+          <h2 className="text-xl font-semibold">
+            Your account
+          </h2>
 
           <dl className="mt-5 grid gap-4 sm:grid-cols-3">
             <div>
-              <dt className="text-sm text-slate-500">Email</dt>
-              <dd className="break-all font-medium">{user.email}</dd>
+              <dt className="text-sm text-slate-500">
+                Email
+              </dt>
+
+              <dd className="break-all font-medium">
+                {user.email}
+              </dd>
             </div>
 
             <div>
-              <dt className="text-sm text-slate-500">Role</dt>
-              <dd className="font-medium">{profile.role}</dd>
+              <dt className="text-sm text-slate-500">
+                Role
+              </dt>
+
+              <dd className="font-medium">
+                {profile.role}
+              </dd>
             </div>
 
             <div>
-              <dt className="text-sm text-slate-500">Account status</dt>
+              <dt className="text-sm text-slate-500">
+                Account status
+              </dt>
+
               <dd className="font-medium text-[#087A68]">
                 {profile.account_status}
               </dd>
@@ -123,13 +135,17 @@ async function AdminDashboard() {
 
         <section aria-labelledby="forecast-heading">
           <div className="mb-5">
-            <h2 id="forecast-heading" className="text-2xl font-bold">
+            <h2
+              id="forecast-heading"
+              className="text-2xl font-bold"
+            >
               Kitchen forecast
             </h2>
 
             <p className="mt-2 text-sm text-slate-600">
-              Up to 21 meals whose serving time has not ended.
-              All times are in IST. Refresh to load the latest choices.
+              Up to 21 meals whose serving time has not
+              ended. All times are in IST. Refresh to load
+              the latest choices.
             </p>
           </div>
 
@@ -138,7 +154,8 @@ async function AdminDashboard() {
               role="alert"
               className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-800"
             >
-              Could not load the kitchen forecast. Please refresh to try again.
+              Could not load the kitchen forecast. Please
+              refresh to try again.
             </div>
           ) : meals.length === 0 ? (
             <div className="rounded-2xl bg-[#EFF5F7] p-8 text-center">
@@ -147,7 +164,8 @@ async function AdminDashboard() {
               </h3>
 
               <p className="mt-2 text-slate-600">
-                Create a meal to start collecting student choices.
+                Create a meal to start collecting student
+                choices.
               </p>
 
               <Link
@@ -175,7 +193,8 @@ async function AdminDashboard() {
                         </p>
 
                         <h3 className="mt-1 text-xl font-bold">
-                          {mealNames[meal.meal_type] || meal.meal_type}
+                          {mealNames[meal.meal_type] ||
+                            meal.meal_type}
                         </h3>
                       </div>
 
@@ -193,6 +212,7 @@ async function AdminDashboard() {
                         <dt className="text-sm font-medium text-emerald-800">
                           Expected diners
                         </dt>
+
                         <dd className="mt-2 text-3xl font-bold text-emerald-900">
                           {meal.opted_in}
                         </dd>
@@ -202,6 +222,7 @@ async function AdminDashboard() {
                         <dt className="text-sm font-medium text-amber-800">
                           Skipping
                         </dt>
+
                         <dd className="mt-2 text-3xl font-bold text-amber-900">
                           {meal.opted_out}
                         </dd>
@@ -210,14 +231,20 @@ async function AdminDashboard() {
 
                     <dl className="mt-5 space-y-3 text-sm">
                       <div>
-                        <dt className="text-slate-500">Serving starts</dt>
+                        <dt className="text-slate-500">
+                          Serving starts
+                        </dt>
+
                         <dd className="font-medium">
                           {formatDateTime(meal.serve_start)}
                         </dd>
                       </div>
 
                       <div>
-                        <dt className="text-slate-500">Serving ends</dt>
+                        <dt className="text-slate-500">
+                          Serving ends
+                        </dt>
+
                         <dd className="font-medium">
                           {formatDateTime(meal.serve_end)}
                         </dd>
@@ -227,6 +254,7 @@ async function AdminDashboard() {
                         <dt className="text-slate-500">
                           Meal-choice deadline
                         </dt>
+
                         <dd className="font-medium">
                           {formatDateTime(meal.cutoff_at)}
                         </dd>
@@ -247,8 +275,9 @@ async function AdminDashboard() {
                       </span>
 
                       <p className="mt-3 text-xs text-slate-500">
-                        Counts reflect saved choices. Students with no
-                        saved choice are not included.
+                        Counts reflect saved choices.
+                        Students with no saved choice are
+                        not included.
                       </p>
                     </div>
                   </article>
@@ -264,7 +293,13 @@ async function AdminDashboard() {
 
 export default function AdminPage() {
   return (
-    <Suspense fallback={<p className="p-8">Loading kitchen forecast...</p>}>
+    <Suspense
+      fallback={
+        <p role="status" className="p-8">
+          Loading kitchen forecast…
+        </p>
+      }
+    >
       <AdminDashboard />
     </Suspense>
   );

@@ -1,68 +1,424 @@
+/* Dashboard uses one consistent light palette. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+.kt-dashboard {
+  color-scheme: light;
 
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
+  --background: 150 20% 97%;
+  --foreground: 193 42% 14%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 193 42% 14%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 193 42% 14%;
+
+  --primary: 171 88% 25%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 150 27% 94%;
+  --secondary-foreground: 171 58% 20%;
+
+  --muted: 150 20% 96%;
+  --muted-foreground: 200 15% 40%;
+
+  --accent: 150 40% 93%;
+  --accent-foreground: 171 58% 20%;
+
+  --border: 150 19% 87%;
+  --input: 150 19% 83%;
+  --ring: 171 88% 25%;
+
+  --destructive: 0 72% 45%;
+  --destructive-foreground: 0 0% 100%;
+}
+
+/* Shared billing and rebate page design. */
+.kt-finance {
+  width: 100%;
+  max-width: 1240px;
+  margin-inline: auto;
+  padding: clamp(20px, 3vw, 40px);
+  color: #152d33;
+}
+
+.kt-finance > * + * {
+  margin-top: 24px;
+}
+
+.kt-finance > header {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border: 1px solid #20574c;
+  border-radius: 24px;
+  padding: clamp(24px, 4vw, 40px);
+  background: linear-gradient(115deg, #103c39, #176354);
+  box-shadow: 0 12px 32px rgb(16 60 57 / 9%);
+}
+
+.kt-finance > header::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 280px;
+  height: 280px;
+  right: -85px;
+  top: -115px;
+  border: 1px solid rgb(215 243 229 / 20%);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 32px rgb(215 243 229 / 5%),
+    0 0 0 64px rgb(215 243 229 / 4%);
+  pointer-events: none;
+}
+
+.kt-finance > header h1 {
+  color: #ffffff;
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.2;
+}
+
+.kt-finance > header p {
+  max-width: 640px;
+  color: #d7eae3;
+  line-height: 1.7;
+}
+
+.kt-finance > header .kt-eyebrow {
+  margin-bottom: 12px;
+  color: #d7f3e5;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.kt-finance > form {
+  border: 1px solid #dce7e2;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 18px 20px;
+  box-shadow: 0 4px 18px rgb(16 60 57 / 3%);
+}
+
+.kt-finance input[type="month"] {
+  min-height: 44px;
+  color-scheme: light;
+  color: #152d33;
+  background: #f8fbf9;
+  border: 1px solid #cfddd6;
+  border-radius: 10px;
+}
+
+.kt-finance input[type="month"]:focus-visible {
+  outline: 2px solid #087a68;
+  outline-offset: 3px;
+}
+
+.kt-finance button[type="submit"] {
+  min-height: 44px;
+  border-radius: 10px;
+}
+
+.kt-finance button:focus-visible,
+.kt-finance a:focus-visible {
+  outline: 2px solid #087a68;
+  outline-offset: 4px;
+}
+
+.kt-finance > .grid > div {
+  min-width: 0;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 5px 20px rgb(16 60 57 / 4%);
+}
+
+/* Existing monthly-bill panels. */
+.kt-finance > div.rounded-xl {
+  overflow: hidden;
+  border-radius: 20px;
+  box-shadow: 0 5px 20px rgb(16 60 57 / 3%);
+}
+
+.kt-finance table {
+  color: #152d33;
+  background: #ffffff;
+}
+
+.kt-finance table thead,
+.kt-finance table tfoot {
+  background: #eef5f1;
+  color: #31594d;
+}
+
+.kt-finance table thead th {
+  padding-block: 16px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.kt-finance table tbody tr {
+  border-color: #e6eee9;
+  transition: background-color 150ms ease;
+}
+
+.kt-finance table tbody tr:hover {
+  background: #f6faf7;
+}
+
+.kt-finance table tbody td,
+.kt-finance table tbody th {
+  padding-block: 20px;
+}
+
+.kt-finance table tfoot th,
+.kt-finance table tfoot td {
+  padding-block: 20px;
+}
+
+/* Rebate summary cards. */
+.kt-stat {
+  border: 1px solid #dce7e2;
+  background: #ffffff;
+}
+
+.kt-stat-label {
+  color: #526d64;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.kt-stat-value {
+  margin-top: 14px;
+  color: #163e34;
+  font-size: clamp(25px, 2.5vw, 32px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.kt-stat-note {
+  margin-top: 8px;
+  color: #647a71;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.kt-stat-feature {
+  border-color: #087a68;
+  background: linear-gradient(135deg, #087a68, #12624f);
+}
+
+.kt-stat-feature .kt-stat-label,
+.kt-stat-feature .kt-stat-note {
+  color: #def4e9;
+}
+
+.kt-stat-feature .kt-stat-value {
+  color: #ffffff;
+}
+
+/* Rebate transaction list. */
+.kt-panel {
+  overflow: hidden;
+  border: 1px solid #dce7e2;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 5px 20px rgb(16 60 57 / 3%);
+}
+
+.kt-panel-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e6eee9;
+  padding: 24px;
+}
+
+.kt-panel-heading h2 {
+  color: #163e34;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.kt-panel-heading p {
+  margin-top: 5px;
+  color: #647a71;
+  font-size: 12px;
+}
+
+.kt-count-badge {
+  border: 1px solid #dce7e2;
+  border-radius: 999px;
+  background: #f4f8f5;
+  padding: 6px 11px;
+  color: #526d64;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.kt-history-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 16px;
+  padding: 24px;
+  transition: background-color 150ms ease;
+}
+
+.kt-history-row + .kt-history-row {
+  border-top: 1px solid #edf2ef;
+}
+
+.kt-history-row:hover {
+  background: #fafcfb;
+}
+
+.kt-event-icon {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  font-size: 23px;
+  font-weight: 500;
+}
+
+.kt-event-credit {
+  background: #e8f6ee;
+  color: #08634c;
+}
+
+.kt-event-reversal {
+  background: #fff2df;
+  color: #965112;
+}
+
+.kt-entry-title {
+  color: #163e34;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kt-entry-menu {
+  margin-top: 5px;
+  color: #526d64;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.kt-entry-meta {
+  margin-top: 8px;
+  color: #6a7e75;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.kt-entry-amount {
+  text-align: right;
+  white-space: nowrap;
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+
+.kt-entry-badge {
+  display: inline-block;
+  margin-top: 8px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.kt-panel-footer {
+  border-top: 1px solid #e6eee9;
+  background: #fafcfb;
+  padding: 16px 24px;
+  color: #647a71;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.kt-empty {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.kt-empty-symbol {
+  display: flex;
+  width: 56px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  border-radius: 18px;
+  background: #e8f6ee;
+  color: #087a68;
+  font-size: 26px;
+}
+
+.kt-finance-note {
+  border: 1px solid #dce7e2;
+  border-radius: 16px;
+  background: #edf5ef;
+  padding: 18px 20px;
+  color: #496557;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+@media (max-width: 639px) {
+  .kt-finance > * + * {
+    margin-top: 18px;
   }
-  .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+
+  .kt-finance > .grid > div {
+    padding: 20px;
+  }
+
+  .kt-panel-heading,
+  .kt-history-row {
+    padding: 18px;
+  }
+
+  .kt-history-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .kt-event-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+  }
+
+  .kt-entry-summary {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .kt-entry-amount {
+    text-align: left;
   }
 }
 
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
+@media (prefers-reduced-motion: reduce) {
+  .kt-finance *,
+  .kt-dashboard nav a {
+    transition: none !important;
   }
 }
