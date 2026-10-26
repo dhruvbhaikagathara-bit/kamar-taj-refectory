@@ -5,36 +5,147 @@ import QRCode from "qrcode";
 import { useEffect, useState } from "react";
 
 export function StudentMealPass({ mealId }: { mealId: string }) {
-  const [retry, setRetry] = useState(0);
+  // Changing meals resets the entire pass panel.
+  return <MealPassPanel key={mealId} mealId={mealId} />;
+}
+
+function MealPassPanel({ mealId }: { mealId: string }) {
+  const [open, setOpen] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   return (
-    <MealPassContent
-      key={`${mealId}:${retry}`}
-      mealId={mealId}
-      onRefresh={() => setRetry((value) => value + 1)}
-    />
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+      <h2 className="text-xl font-bold text-[#152D33]">
+        Your meal pass
+      </h2>
+
+      <p className="mt-2 text-sm text-slate-600">
+        Open your pass when you are ready to collect your meal.
+      </p>
+
+      {open ? (
+        <ActiveMealPass
+          key={attempt}
+          mealId={mealId}
+          onClose={() => setOpen(false)}
+          onRetry={() => setAttempt((value) => value + 1)}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="mt-5 min-h-11 rounded-xl bg-[#087A68] px-5 py-3 font-semibold text-white hover:bg-[#066454] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087A68] focus-visible:ring-offset-2"
+        >
+          Show meal pass
+        </button>
+      )}
+
+      <p className="mt-4 text-xs text-slate-500">
+        Keep your pass private. Each meal can be collected only once.
+      </p>
+    </section>
   );
 }
 
-function MealPassContent({
+function ActiveMealPass({
   mealId,
-  onRefresh,
+  onClose,
+  onRetry,
 }: {
   mealId: string;
-  onRefresh: () => void;
+  onClose: () => void;
+  onRetry: () => void;
 }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [collected, setCollected] = useState(false);
 
   useEffect(() => {
     let disposed = false;
+    let stopped = false;
     let deadline = 0;
+    let failureCount = 0;
+
     let controller: AbortController | null = null;
+    let refreshTimer: number | null = null;
+    let requestTimeout: number | null = null;
+
+    function clearRefreshTimer() {
+      if (refreshTimer !== null) {
+        window.clearTimeout(refreshTimer);
+        refreshTimer = null;
+      }
+    }
+
+    function clearRequestTimeout() {
+      if (requestTimeout !== null) {
+        window.clearTimeout(requestTimeout);
+        requestTimeout = null;
+      }
+    }
+
+    function clearPass() {
+      deadline = 0;
+      setImageUrl(null);
+      setSecondsLeft(0);
+    }
+
+    function scheduleRefresh(delay: number) {
+      clearRefreshTimer();
+
+      if (disposed || stopped || document.hidden) return;
+
+      refreshTimer = window.setTimeout(() => {
+        refreshTimer = null;
+        requestRefresh();
+      }, delay);
+    }
+
+    function scheduleRetry(errorMessage: string) {
+      failureCount += 1;
+
+      // Back off: approximately 5, 10, 20, then 40 seconds.
+      const baseDelay = Math.min(
+        5000 * 2 ** Math.min(failureCount - 1, 3),
+        40000,
+      );
+
+      // Spread retries slightly across different students.
+      const delay = baseDelay + Math.floor(Math.random() * 1000);
+      const seconds = Math.ceil(delay / 1000);
+
+      setMessage(
+        `${errorMessage} Retrying in about ${seconds} seconds.`,
+      );
+
+      scheduleRefresh(delay);
+    }
+
+    // Called only from timer or visibility events.
+    function requestRefresh() {
+      if (
+        disposed ||
+        stopped ||
+        document.hidden ||
+        controller !== null
+      ) {
+        return;
+      }
+
+      setLoading(true);
+      setMessage("");
+      void refreshPass();
+    }
 
     async function refreshPass() {
-      if (disposed || controller !== null || document.hidden) {
+      if (
+        disposed ||
+        stopped ||
+        document.hidden ||
+        controller !== null
+      ) {
         return;
       }
 
@@ -42,16 +153,17 @@ function MealPassContent({
       const requestController = new AbortController();
       controller = requestController;
 
-      const timeout = window.setTimeout(
-        () => requestController.abort(),
-        10000,
-      );
+      const timeout = window.setTimeout(() => {
+        requestController.abort();
+      }, 10000);
+
+      requestTimeout = timeout;
 
       function isCurrentRequest() {
         return (
           !disposed &&
-          controller === requestController &&
-          !document.hidden
+          !document.hidden &&
+          controller === requestController
         );
       }
 
@@ -64,20 +176,72 @@ function MealPassContent({
           },
         );
 
-        const body = await response.json();
+        // A proxy may return non-JSON errors.
+        const body = await response.json().catch(() => null);
 
         if (!isCurrentRequest()) return;
 
         if (!response.ok) {
-          throw new Error(
+          clearPass();
+
+          const errorMessage =
             typeof body?.message === "string"
               ? body.message
-              : "Unable to load your meal pass.",
-          );
+              : "Unable to load your meal pass.";
+
+          if (response.status === 429) {
+            // Support rate limiting if it is added to the API.
+            const retryAfter = response.headers.get("Retry-After");
+
+            let delay = 30000;
+
+            if (retryAfter) {
+              const seconds = Number(retryAfter);
+
+              if (Number.isFinite(seconds) && seconds >= 0) {
+                delay = seconds * 1000;
+              } else {
+                const retryDate = Date.parse(retryAfter);
+
+                if (Number.isFinite(retryDate)) {
+                  delay = retryDate - Date.now();
+                }
+              }
+            }
+
+            delay = Math.min(
+              2147483647,
+              Math.max(5000, delay),
+            );
+
+            setMessage(
+              `${errorMessage} Retrying in about ${Math.ceil(
+                delay / 1000,
+              )} seconds.`,
+            );
+
+            scheduleRefresh(delay);
+            return;
+          }
+
+          if (response.status >= 400 && response.status < 500) {
+            // Your API uses these responses for authentication,
+            // eligibility and serving-window rejections.
+            stopped = true;
+            clearRefreshTimer();
+
+            setCollected(body?.code === "ALREADY_REDEEMED");
+            setMessage(errorMessage);
+            return;
+          }
+
+          scheduleRetry(errorMessage);
+          return;
         }
 
         if (
           typeof body?.token !== "string" ||
+          body.token.length === 0 ||
           typeof body?.expiresAt !== "string" ||
           typeof body?.serverNow !== "string"
         ) {
@@ -91,12 +255,12 @@ function MealPassContent({
 
         if (!Number.isFinite(lifetime) || lifetime <= 0) {
           throw new Error(
-            "This pass has expired. Please try again.",
+            "The pass expired before it could be displayed.",
           );
         }
 
-        // Subtract request time conservatively.
-        // performance.now() avoids relying on the browser's wall clock.
+        // Preserve the existing 30-second display cap.
+        // Subtract request time by starting from requestStarted.
         const nextDeadline =
           requestStarted + Math.min(lifetime, 30000);
 
@@ -112,40 +276,51 @@ function MealPassContent({
 
         if (!isCurrentRequest()) return;
 
-        if (nextDeadline <= performance.now()) {
+        const remaining = nextDeadline - performance.now();
+
+        if (remaining <= 0) {
           throw new Error(
-            "The pass expired while loading. Try again.",
+            "The pass expired while loading.",
           );
         }
 
         deadline = nextDeadline;
+        failureCount = 0;
 
         setImageUrl(nextImage);
-        setSecondsLeft(
-          Math.max(
-            0,
-            Math.ceil((deadline - performance.now()) / 1000),
-          ),
-        );
+        setSecondsLeft(Math.ceil(remaining / 1000));
         setMessage("");
+        setCollected(false);
+
+        // Normally refresh five seconds before display expiry.
+        // For a nearly expired pass, wait until expiry instead
+        // of creating a rapid refresh loop.
+        const refreshDelay =
+          remaining > 5000
+            ? remaining - 5000
+            : remaining;
+
+        scheduleRefresh(Math.max(1000, refreshDelay));
       } catch (error) {
         if (!isCurrentRequest()) return;
 
-        deadline = 0;
-        setImageUrl(null);
-        setSecondsLeft(0);
+        clearPass();
 
-        setMessage(
+        const errorMessage =
           error instanceof Error && error.name === "AbortError"
-            ? "The request timed out. Check your connection and retry."
+            ? "The request timed out."
             : error instanceof Error
               ? error.message
-              : "Unable to load your meal pass.",
-        );
+              : "Unable to load your meal pass.";
+
+        scheduleRetry(errorMessage);
       } finally {
         window.clearTimeout(timeout);
 
-        // An older request must not change a newer request's state.
+        if (requestTimeout === timeout) {
+          requestTimeout = null;
+        }
+
         if (controller === requestController) {
           controller = null;
 
@@ -156,23 +331,8 @@ function MealPassContent({
       }
     }
 
-    // Called by timer and visibility events, not during effect setup.
-    function requestRefresh() {
-      if (disposed || controller !== null || document.hidden) {
-        return;
-      }
-
-      setLoading(true);
-      setMessage("");
-      void refreshPass();
-    }
-
-    const refreshTimer = window.setInterval(() => {
-      requestRefresh();
-    }, 20000);
-
     const countdownTimer = window.setInterval(() => {
-      if (disposed) return;
+      if (disposed || document.hidden) return;
 
       const remaining = Math.max(
         0,
@@ -184,26 +344,27 @@ function MealPassContent({
       if (remaining === 0) {
         setImageUrl(null);
       }
-    }, 250);
+    }, 1000);
 
     function handleVisibilityChange() {
       if (disposed) return;
 
-      // Invalidate the previous request before aborting it.
+      clearRefreshTimer();
+      clearRequestTimeout();
+
+      // Invalidate first so the old request cannot update the UI.
       const previousController = controller;
       controller = null;
       previousController?.abort();
 
-      deadline = 0;
-      setImageUrl(null);
-      setSecondsLeft(0);
-      setMessage("");
+      clearPass();
 
-      if (document.hidden) {
+      if (document.hidden || stopped) {
         setLoading(false);
-      } else {
-        requestRefresh();
+        return;
       }
+
+      requestRefresh();
     }
 
     document.addEventListener(
@@ -211,17 +372,18 @@ function MealPassContent({
       handleVisibilityChange,
     );
 
-    // Initial loading state already comes from useState(true).
-    // State updates happen after the asynchronous request completes.
+    // Initial loading state is already true.
     void refreshPass();
 
     return () => {
       disposed = true;
 
+      clearRefreshTimer();
+      clearRequestTimeout();
+
       controller?.abort();
       controller = null;
 
-      window.clearInterval(refreshTimer);
       window.clearInterval(countdownTimer);
 
       document.removeEventListener(
@@ -232,15 +394,7 @@ function MealPassContent({
   }, [mealId]);
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-      <h2 className="text-xl font-bold text-[#152D33]">
-        Your meal pass
-      </h2>
-
-      <p className="mt-2 text-sm text-slate-600">
-        Show this QR code to the scanner staff.
-      </p>
-
+    <>
       {imageUrl && secondsLeft > 0 ? (
         <>
           <Image
@@ -259,11 +413,17 @@ function MealPassContent({
           <p className="mt-2 text-sm text-slate-500">
             {loading
               ? "Refreshing pass…"
-              : "Refreshes automatically."}
+              : "Show this code to the scanner staff."}
           </p>
         </>
       ) : (
         <div className="my-6 rounded-xl bg-slate-50 p-6">
+          {collected && (
+            <p className="mb-2 font-semibold text-[#087A68]">
+              Meal collected
+            </p>
+          )}
+
           <p role="status" className="text-sm text-slate-700">
             {loading
               ? "Creating your meal pass…"
@@ -273,18 +433,26 @@ function MealPassContent({
         </div>
       )}
 
-      <button
-        type="button"
-        disabled={loading}
-        onClick={onRefresh}
-        className="mt-5 min-h-11 rounded-xl bg-[#087A68] px-5 py-3 font-semibold text-white hover:bg-[#066454] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087A68] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {loading ? "Please wait…" : "Refresh pass"}
-      </button>
+      <div className="mt-5 flex flex-wrap justify-center gap-3">
+        {!collected && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={onRetry}
+            className="min-h-11 rounded-xl bg-[#087A68] px-5 py-3 font-semibold text-white hover:bg-[#066454] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087A68] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loading ? "Please wait…" : "Refresh pass"}
+          </button>
+        )}
 
-      <p className="mt-4 text-xs text-slate-500">
-        Keep your pass private. Each meal can be collected only once.
-      </p>
-    </section>
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-h-11 rounded-xl border border-slate-300 px-5 py-3 font-semibold text-[#152D33] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#087A68] focus-visible:ring-offset-2"
+        >
+          Close pass
+        </button>
+      </div>
+    </>
   );
 }
