@@ -18,7 +18,10 @@ import {
   isSurplusExpired,
   type MealSurplusReport,
 } from "@/lib/meal-surplus-types";
-
+import {
+  MealForecastCard,
+  type MealForecast,
+} from "@/components/meal-forecast-card";
 type PageProps = {
   searchParams: Promise<{
     date?: string | string[];
@@ -117,6 +120,29 @@ async function AnalyticsContent({
   }
 
   const meals = (data ?? []) as MealAnalytics[];
+  let forecasts: MealForecast[] = [];
+let forecastLoadFailed = false;
+
+if (meals.length > 0) {
+  const forecastResult = await supabase.rpc(
+    "get_admin_meal_forecasts",
+    { p_meal_date: date }
+  );
+
+  if (forecastResult.error) {
+    forecastLoadFailed = true;
+  } else {
+    forecasts =
+      (forecastResult.data ?? []) as MealForecast[];
+  }
+}
+
+const forecastByMeal = new Map(
+  forecasts.map((forecast) => [
+    forecast.meal_slot_id,
+    forecast,
+  ])
+);
   let surplusReports: MealSurplusReport[] = [];
 let surplusLoadFailed = false;
 
@@ -411,6 +437,67 @@ const collectionDeadlineFormatter = new Intl.DateTimeFormat(
       ) : (
         <>
           <ConsumptionCharts meals={meals} />
+          <section
+  aria-labelledby="forecast-heading"
+  className="space-y-5"
+>
+  <div>
+    <h2
+      id="forecast-heading"
+      className="text-2xl font-bold text-[#103C39]"
+    >
+      Meal demand and excess forecasting
+    </h2>
+
+    <p className="mt-2 text-sm leading-6 text-slate-600">
+      Estimate meal collections before serving starts,
+      then compare them with your planned preparation.
+      Predictions use historical collection rates.
+    </p>
+  </div>
+
+  {forecastLoadFailed ? (
+    <div
+      role="alert"
+      className="rounded-xl border border-red-200 bg-red-50 p-5 text-sm text-red-800"
+    >
+      Forecasts could not be loaded. Refresh the page
+      and try again. Other analytics remain available.
+    </div>
+  ) : (
+    <div className="grid items-start gap-5 lg:grid-cols-2">
+      {meals.map((meal) => {
+        const forecast = forecastByMeal.get(meal.id);
+
+        if (!forecast) {
+          return (
+            <article
+              key={meal.id}
+              className="rounded-2xl border border-slate-200 bg-white p-5"
+            >
+              <h3 className="font-bold text-[#103C39]">
+                {mealLabel(meal.meal_type)} forecast
+              </h3>
+
+              <p className="mt-2 text-sm text-slate-600">
+                Forecast data is unavailable for this meal.
+                Refresh to check again.
+              </p>
+            </article>
+          );
+        }
+
+        return (
+          <MealForecastCard
+            key={meal.id}
+            mealLabel={mealLabel(meal.meal_type)}
+            forecast={forecast}
+          />
+        );
+      })}
+    </div>
+  )}
+</section>
           <section
   aria-labelledby="surplus-heading"
   className="space-y-5"
