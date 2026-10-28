@@ -8,6 +8,7 @@ type Role = "STUDENT" | "ADMIN" | "SCANNER_STAFF";
 
 type IconName =
   | "meals"
+  | "planner"
   | "qr"
   | "rebates"
   | "bill"
@@ -25,32 +26,39 @@ type NavigationItem = {
 
 const navigation: Record<Role, NavigationItem[]> = {
   STUDENT: [
-    {
-      label: "My meals",
-      mobileLabel: "Meals",
-      href: "/student",
-      icon: "meals",
-    },
-    {
-      label: "Meal QR",
-      mobileLabel: "Meal QR",
-      href: "/student/qr",
-      icon: "qr",
-    },
-    {
-      label: "Rebate history",
-      mobileLabel: "Rebates",
-      href: "/student/billing",
-      icon: "rebates",
-    },
-    {
-      label: "Monthly bill",
-      mobileLabel: "Bill",
-      href: "/student/billing/statement",
-      icon: "bill",
-    },
-  ],
-    ADMIN: [
+  {
+    label: "My meals",
+    mobileLabel: "Meals",
+    href: "/student",
+    icon: "meals",
+  },
+  {
+    label: "Meal Planner",
+    mobileLabel: "Planner",
+    href: "/student/planner",
+    icon: "meals",
+  },
+  {
+    label: "Meal QR",
+    mobileLabel: "Meal QR",
+    href: "/student/qr",
+    icon: "qr",
+  },
+  {
+    label: "Rebate history",
+    mobileLabel: "Rebates",
+    href: "/student/billing",
+    icon: "rebates",
+  },
+  {
+    label: "Monthly bill",
+    mobileLabel: "Bill",
+    href: "/student/billing/statement",
+    icon: "bill",
+  },
+],
+
+  ADMIN: [
     {
       label: "Kitchen overview",
       mobileLabel: "Overview",
@@ -76,6 +84,7 @@ const navigation: Record<Role, NavigationItem[]> = {
       icon: "overview",
     },
   ],
+
   SCANNER_STAFF: [
     {
       label: "Meal scanner",
@@ -100,6 +109,20 @@ function NavigationIcon({ name }: { name: IconName }) {
         <path d="M19 21V3c-3 2-4 5-4 9h4" />
       </>
     ),
+
+    planner: (
+      <>
+        <rect
+          x="3"
+          y="5"
+          width="18"
+          height="16"
+          rx="2"
+        />
+        <path d="M7 3v4M17 3v4M3 10h18m-13 6 3 3 5-6" />
+      </>
+    ),
+
     qr: (
       <>
         <rect x="3" y="3" width="6" height="6" rx="1" />
@@ -108,19 +131,21 @@ function NavigationIcon({ name }: { name: IconName }) {
         <path d="M15 15h3v3h3M15 21h3M21 12v3M12 3v3" />
       </>
     ),
+
     rebates: (
       <>
         <path d="M3 8h16a2 2 0 0 1 2 2v9H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h12v3" />
-        <path d="M21 12h-5v4h5" />
-        <path d="M17 14h.01" />
+        <path d="M21 12h-5v4h5M17 14h.01" />
       </>
     ),
+
     bill: (
       <>
         <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
         <path d="M9 7h6M9 11h6M9 15h3" />
       </>
     ),
+
     overview: (
       <>
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -129,22 +154,29 @@ function NavigationIcon({ name }: { name: IconName }) {
         <rect x="14" y="14" width="7" height="7" rx="1" />
       </>
     ),
+
     add: (
       <>
-        <rect x="3" y="3" width="18" height="18" rx="4" />
+        <rect
+          x="3"
+          y="3"
+          width="18"
+          height="18"
+          rx="4"
+        />
         <path d="M12 8v8M8 12h8" />
       </>
     ),
+
     edit: (
       <>
         <path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z" />
         <path d="M13 20h7" />
       </>
     ),
+
     scan: (
-      <>
-        <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5M3 12h18" />
-      </>
+      <path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5M3 12h18" />
     ),
   };
 
@@ -180,7 +212,7 @@ export function DashboardShell({
 
   function renderLinks(mobile: boolean) {
     return items.map((item) => {
-      // Exact matching prevents both billing links being highlighted.
+      // Exact matching prevents multiple active links.
       const active = pathname === item.href;
 
       return (
@@ -189,7 +221,7 @@ export function DashboardShell({
           href={item.href}
           aria-current={active ? "page" : undefined}
           className={[
-            "group flex min-h-12 rounded-xl font-medium",
+            "group flex min-h-12 min-w-0 rounded-xl font-medium",
             "transition-colors focus-visible:outline-none",
             "focus-visible:ring-2 focus-visible:ring-emerald-400",
             mobile
@@ -206,7 +238,9 @@ export function DashboardShell({
         >
           <NavigationIcon name={item.icon} />
 
-          <span>
+          <span
+            className={mobile ? "text-center" : undefined}
+          >
             {mobile ? item.mobileLabel : item.label}
           </span>
 
@@ -223,7 +257,7 @@ export function DashboardShell({
 
   return (
     <div className="kt-dashboard min-h-screen w-full bg-[#F5F8F7] text-[#152D33]">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-white/10 bg-[#103C39] p-5 text-white md:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col overflow-y-auto border-r border-white/10 bg-[#103C39] p-5 text-white md:flex">
         <Link
           href={items[0].href}
           className="flex items-center gap-3 rounded-xl px-2 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
@@ -271,9 +305,10 @@ export function DashboardShell({
             <p className="text-sm font-medium text-emerald-50">
               Every meal matters.
             </p>
+
             <p className="mt-2 text-xs leading-5 text-emerald-100/70">
-              Plan ahead. Make thoughtful choices.
-              Help your kitchen reduce food waste.
+              Plan ahead. Make thoughtful choices. Help
+              your kitchen reduce food waste.
             </p>
           </div>
         </div>
@@ -286,6 +321,7 @@ export function DashboardShell({
         >
           Kamar-Taj Refectory
         </Link>
+
         <p className="mt-1 text-xs text-slate-500">
           {roleLabels[role]}
         </p>

@@ -9,12 +9,21 @@ export type CreateMealState = {
   message: string;
 };
 
+const IST_OFFSET_MS = 330 * 60 * 1000;
+
 function readText(formData: FormData, name: string): string {
   const value = formData.get(name);
   return typeof value === "string" ? value.trim() : "";
 }
 
-// Interpret form dates and times as Indian Standard Time.
+function getISTDate(milliseconds: number): string {
+  return new Date(milliseconds + IST_OFFSET_MS)
+    .toISOString()
+    .slice(0, 10);
+}
+
+// Form date/time values are interpreted as IST,
+// regardless of the server's configured timezone.
 function parseIST(value: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
     return null;
@@ -26,14 +35,35 @@ function parseIST(value: string): Date | null {
     return null;
   }
 
-  // Reject invalid dates that JavaScript might otherwise normalize.
-  const localValue = new Date(
-    date.getTime() + 330 * 60 * 1000
+  // Reject dates that JavaScript would otherwise normalize.
+  const roundTrip = new Date(
+    date.getTime() + IST_OFFSET_MS
   )
     .toISOString()
     .slice(0, 16);
 
-  return localValue === value ? date : null;
+  return roundTrip === value ? date : null;
+}
+
+function validateFutureSchedule(
+  mealDate: string,
+  cutoff: Date,
+  start: Date,
+  now: number
+): string | null {
+  if (mealDate < getISTDate(now)) {
+    return "You cannot create a meal for a date before today in IST.";
+  }
+
+  if (start.getTime() <= now) {
+    return "Serving must start after the current time in IST.";
+  }
+
+  if (cutoff.getTime() <= now) {
+    return "The meal-choice cutoff must be after the current time in IST.";
+  }
+
+  return null;
 }
 
 export async function createMeal(
@@ -52,11 +82,25 @@ export async function createMeal(
   const endText = readText(formData, "serve_end");
 
   if (!parseIST(`${mealDate}T00:00`)) {
-    return { success: false, message: "Choose a valid meal date." };
+    return {
+      success: false,
+      message: "Choose a valid meal date.",
+    };
+  }
+
+  if (mealDate < getISTDate(Date.now())) {
+    return {
+      success: false,
+      message:
+        "You cannot create a meal for a date before today in IST.",
+    };
   }
 
   if (!["BREAKFAST", "LUNCH", "DINNER"].includes(mealType)) {
-    return { success: false, message: "Choose a valid meal type." };
+    return {
+      success: false,
+      message: "Choose a valid meal type.",
+    };
   }
 
   if (menu.length < 3 || menu.length > 1000) {
@@ -69,19 +113,22 @@ export async function createMeal(
   if (!/^\d{1,5}(\.\d{1,2})?$/.test(priceText)) {
     return {
       success: false,
-      message: "Enter a valid price with at most two decimal places.",
+      message:
+        "Enter a valid price with at most two decimal places.",
     };
   }
 
-  // Store money as whole paise, rather than decimal rupees.
+  // Store whole paise without floating-point multiplication.
   const [rupees, fraction = ""] = priceText.split(".");
   const pricePaise =
-    Number(rupees) * 100 + Number(fraction.padEnd(2, "0"));
+    Number(rupees) * 100 +
+    Number(fraction.padEnd(2, "0"));
 
   if (pricePaise > 1000000) {
     return {
       success: false,
-      message: "The meal price must be between ₹0 and ₹10,000.",
+      message:
+        "The meal price must be between ₹0 and ₹10,000.",
     };
   }
 
@@ -92,28 +139,24 @@ export async function createMeal(
   if (!cutoff || !start || !end) {
     return {
       success: false,
-      message: "Enter valid cutoff and serving dates and times.",
+      message:
+        "Enter valid cutoff and serving dates and times in IST.",
     };
   }
 
   if (startText.slice(0, 10) !== mealDate) {
     return {
       success: false,
-      message: "Serving must start on the selected meal date.",
-    };
-  }
-
-  if (cutoff.getTime() <= Date.now()) {
-    return {
-      success: false,
-      message: "The cutoff must be in the future.",
+      message:
+        "Serving must start on the selected meal date.",
     };
   }
 
   if (cutoff.getTime() > start.getTime()) {
     return {
       success: false,
-      message: "The cutoff cannot be after serving starts.",
+      message:
+        "The cutoff cannot be after serving starts.",
     };
   }
 
@@ -124,7 +167,37 @@ export async function createMeal(
     };
   }
 
+  const scheduleError = validateFutureSchedule(
+    mealDate,
+    cutoff,
+    start,
+    Date.now()
+  );
+
+  if (scheduleError) {
+    return {
+      success: false,
+      message: scheduleError,
+    };
+  }
+
   const supabase = await createClient();
+
+  // Recheck immediately before sending the insert.
+  // The form may have been open for a long time.
+  const latestScheduleError = validateFutureSchedule(
+    mealDate,
+    cutoff,
+    start,
+    Date.now()
+  );
+
+  if (latestScheduleError) {
+    return {
+      success: false,
+      message: latestScheduleError,
+    };
+  }
 
   const { data, error } = await supabase
     .from("meal_slots")
@@ -144,11 +217,16 @@ export async function createMeal(
     if (error.code === "23505") {
       return {
         success: false,
-        message: "That meal type already exists for this date.",
+        message:
+          "That meal type already exists for this date.",
       };
     }
 
-    console.error("Meal creation failed:", error.code, error.message);
+    console.error(
+      "Meal creation failed:",
+      error.code,
+      error.message
+    );
 
     return {
       success: false,
@@ -159,12 +237,14 @@ export async function createMeal(
   if (!data) {
     return {
       success: false,
-      message: "Meal creation could not be confirmed. Refresh before retrying.",
+      message:
+        "Meal creation could not be confirmed. Refresh before retrying.",
     };
   }
 
   revalidatePath("/admin");
   revalidatePath("/admin/meals");
+  revalidatePath("/admin/analytics");
   revalidatePath("/student");
 
   return {

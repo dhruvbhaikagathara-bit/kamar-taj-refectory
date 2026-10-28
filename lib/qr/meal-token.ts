@@ -2,12 +2,19 @@ import "server-only";
 
 import { Buffer } from "node:buffer";
 import { randomUUID } from "node:crypto";
-import { SignJWT, jwtVerify, errors } from "jose";
+import {
+  SignJWT,
+  jwtVerify,
+  decodeProtectedHeader,
+  importPKCS8,
+  importSPKI,
+  errors,
+} from "jose";
 
 const TOKEN_ISSUER = "kamar-taj-refectory";
 const TOKEN_AUDIENCE = "kamar-taj-meal-checkin";
-const KEY_ID = "qr-key-v1";
 
+const LEGACY_KEY_ID = "qr-key-v1";
 const TOKEN_LIFETIME_SECONDS = 30;
 const MAX_TOKEN_LENGTH = 2048;
 
@@ -39,16 +46,108 @@ export type VerifiedMealToken = {
   studentId: string;
   mealSlotId: string;
   tokenId: string;
-  // These timestamps are Unix seconds.
   issuedAt: number;
   expiresAt: number;
 };
 
+let privateKeyPromise:
+  | ReturnType<typeof importPKCS8>
+  | undefined;
+
+let publicKeyPromise:
+  | ReturnType<typeof importSPKI>
+  | undefined;
+
 function isUuid(value: unknown): value is string {
-  return typeof value === "string" && UUID_PATTERN.test(value);
+  return (
+    typeof value === "string" &&
+    UUID_PATTERN.test(value)
+  );
 }
 
-function getSigningKey(): Uint8Array {
+function getKeyId(): string {
+  const keyId = process.env.QR_SIGNING_KEY_ID?.trim();
+
+  if (
+    !keyId ||
+    !/^[a-zA-Z0-9_-]{1,80}$/.test(keyId) ||
+    keyId === LEGACY_KEY_ID
+  ) {
+    throw new Error(
+      "QR_SIGNING_KEY_ID must be a valid, non-legacy key ID."
+    );
+  }
+
+  return keyId;
+}
+
+function readPem(
+  variable:
+    | "QR_PRIVATE_KEY_BASE64"
+    | "QR_PUBLIC_KEY_BASE64",
+  expectedHeader: string
+): string {
+  const encoded = process.env[variable]?.trim();
+
+  if (
+    !encoded ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)
+  ) {
+    throw new Error(`${variable} is missing or invalid.`);
+  }
+
+  const pem = Buffer.from(encoded, "base64")
+    .toString("utf8")
+    .trim();
+
+  if (!pem.startsWith(expectedHeader)) {
+    throw new Error(
+      `${variable} does not contain the expected PEM key.`
+    );
+  }
+
+  return pem;
+}
+
+function getPrivateKey() {
+  if (!privateKeyPromise) {
+    const pem = readPem(
+      "QR_PRIVATE_KEY_BASE64",
+      "-----BEGIN PRIVATE KEY-----"
+    );
+
+    privateKeyPromise = importPKCS8(pem, "ES256").catch(
+      (error: unknown) => {
+        privateKeyPromise = undefined;
+        throw error;
+      }
+    );
+  }
+
+  return privateKeyPromise;
+}
+
+function getPublicKey() {
+  if (!publicKeyPromise) {
+    const pem = readPem(
+      "QR_PUBLIC_KEY_BASE64",
+      "-----BEGIN PUBLIC KEY-----"
+    );
+
+    publicKeyPromise = importSPKI(pem, "ES256").catch(
+      (error: unknown) => {
+        publicKeyPromise = undefined;
+        throw error;
+      }
+    );
+  }
+
+  return publicKeyPromise;
+}
+
+// Used only on the server to verify old HS256 passes.
+// Never return this secret from an API.
+function getLegacyKey(): Uint8Array {
   const secret = process.env.QR_SIGNING_SECRET;
 
   if (!secret || !/^[0-9a-f]{64}$/i.test(secret)) {
@@ -57,8 +156,29 @@ function getSigningKey(): Uint8Array {
     );
   }
 
-  // Decode the generated hexadecimal secret into 32 bytes.
   return new Uint8Array(Buffer.from(secret, "hex"));
+}
+
+// A later preparation endpoint will expose only this
+// public verification information to authorized scanners.
+export async function getMealVerificationKey(): Promise<{
+  algorithm: "ES256";
+  keyId: string;
+  publicKeyPem: string;
+}> {
+  const keyId = getKeyId();
+
+  // Validate that the configured public key can be imported.
+  await getPublicKey();
+
+  return {
+    algorithm: "ES256",
+    keyId,
+    publicKeyPem: readPem(
+      "QR_PUBLIC_KEY_BASE64",
+      "-----BEGIN PUBLIC KEY-----"
+    ),
+  };
 }
 
 export async function createMealToken({
@@ -70,19 +190,24 @@ export async function createMealToken({
   expiresAt: string;
 }> {
   if (!isUuid(studentId) || !isUuid(mealSlotId)) {
-    throw new Error("Invalid student or meal ID supplied to token signer.");
+    throw new Error(
+      "Invalid student or meal ID supplied to token signer."
+    );
   }
 
   const servingEndMilliseconds = Date.parse(serveEnd);
 
   if (!Number.isFinite(servingEndMilliseconds)) {
-    throw new Error("Invalid serving end time supplied to token signer.");
+    throw new Error(
+      "Invalid serving end time supplied to token signer."
+    );
   }
 
-  const key = getSigningKey();
+  const keyId = getKeyId();
+  const key = await getPrivateKey();
+
   const issuedAt = Math.floor(Date.now() / 1000);
 
-  // A token must never outlive its meal's serving window.
   const expiresAt = Math.min(
     issuedAt + TOKEN_LIFETIME_SECONDS,
     Math.floor(servingEndMilliseconds / 1000)
@@ -96,9 +221,9 @@ export async function createMealToken({
     slot: mealSlotId,
   })
     .setProtectedHeader({
-      alg: "HS256",
+      alg: "ES256",
       typ: "JWT",
-      kid: KEY_ID,
+      kid: keyId,
     })
     .setIssuer(TOKEN_ISSUER)
     .setAudience(TOKEN_AUDIENCE)
@@ -125,23 +250,59 @@ export async function verifyMealToken(
     throw new MealTokenError("INVALID_TOKEN");
   }
 
-  // Keep configuration errors separate from invalid-token errors.
-  const key = getSigningKey();
+  let header: ReturnType<typeof decodeProtectedHeader>;
 
   try {
-    const { payload, protectedHeader } = await jwtVerify(token, key, {
-      algorithms: ["HS256"],
+    header = decodeProtectedHeader(token);
+  } catch {
+    throw new MealTokenError("INVALID_TOKEN");
+  }
+
+  if (header.typ !== "JWT") {
+    throw new MealTokenError("INVALID_TOKEN");
+  }
+
+  // The unverified header selects only one of our
+  // explicitly configured algorithm/key combinations.
+  // It never supplies a key or a remote key URL.
+  const isLegacy =
+    header.alg === "HS256" &&
+    header.kid === LEGACY_KEY_ID;
+
+  if (
+    !isLegacy &&
+    (
+      header.alg !== "ES256" ||
+      header.kid !== getKeyId()
+    )
+  ) {
+    throw new MealTokenError("INVALID_TOKEN");
+  }
+
+  // Load keys outside the token-error handler so
+  // configuration problems remain server errors.
+  const key = isLegacy
+    ? getLegacyKey()
+    : await getPublicKey();
+
+  const algorithm = isLegacy ? "HS256" : "ES256";
+
+  try {
+    const { payload } = await jwtVerify(token, key, {
+      algorithms: [algorithm],
       issuer: TOKEN_ISSUER,
       audience: TOKEN_AUDIENCE,
       typ: "JWT",
-      requiredClaims: ["sub", "slot", "jti", "iat", "exp"],
+      requiredClaims: [
+        "sub",
+        "slot",
+        "jti",
+        "iat",
+        "exp",
+      ],
       maxTokenAge: TOKEN_LIFETIME_SECONDS,
       clockTolerance: 0,
     });
-
-    if (protectedHeader.kid !== KEY_ID) {
-      throw new MealTokenError("INVALID_TOKEN");
-    }
 
     const { sub, slot, jti, iat, exp } = payload;
 
@@ -158,6 +319,7 @@ export async function verifyMealToken(
     }
 
     if (
+      iat < 0 ||
       exp <= iat ||
       exp - iat > TOKEN_LIFETIME_SECONDS
     ) {
